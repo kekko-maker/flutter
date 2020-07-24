@@ -60,8 +60,10 @@ const double _kDividerThickness = 1.0;
 // dialog's background color
 // Extracted from https://developer.apple.com/design/resources/.
 const Color _kDialogColor = CupertinoDynamicColor.withBrightness(
-  color: Color(0xCCF2F2F2),
-  darkColor: Color(0xBF1E1E1E),
+  color: Color(0xFFFFFFFF),
+  //color: Color(0xCCF2F2F2),
+  darkColor: Color(0xFF1E1E1E),
+  //darkColor: Color(0xBF1E1E1E),
 );
 
 // Translucent light gray that is painted on top of the blurred backdrop as the
@@ -69,7 +71,9 @@ const Color _kDialogColor = CupertinoDynamicColor.withBrightness(
 // Eyeballed from iOS 13 beta simulator.
 const Color _kDialogPressedColor = CupertinoDynamicColor.withBrightness(
   color: Color(0xFFE1E1E1),
+  //color: Color(0xFFE1E1E1),
   darkColor: Color(0xFF2E2E2E),
+ // darkColor: Color(0xFF2E2E2E),
 );
 
 // The alert dialog layout policy changes depending on whether the user is using
