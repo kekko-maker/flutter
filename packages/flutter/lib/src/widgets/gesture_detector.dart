@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
@@ -195,6 +197,12 @@ class GestureRecognizerFactoryWithHandlers<T extends GestureRecognizer> extends 
 ///
 /// To see how large the hit test box of a [GestureDetector] is for debugging
 /// purposes, set [debugPaintPointersEnabled] to true.
+///
+/// See also:
+///
+///  * [Listener], a widget for listening to lower-level raw pointer events.
+///  * [MouseRegion], a widget that tracks the movement of mice, even when no
+///    button is pressed.
 class GestureDetector extends StatelessWidget {
   /// Creates a widget that detects gestures.
   ///

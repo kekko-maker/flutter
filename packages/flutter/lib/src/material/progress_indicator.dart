@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -204,6 +206,8 @@ class _LinearProgressIndicatorPainter extends CustomPainter {
 
 /// A material design linear progress indicator, also known as a progress bar.
 ///
+/// {@youtube 560 315 https://www.youtube.com/watch?v=O-rhXZLtpv0}
+///
 /// A widget that shows progress along a line. There are two kinds of linear
 /// progress indicators:
 ///
@@ -394,6 +398,8 @@ class _CircularProgressIndicatorPainter extends CustomPainter {
 
 /// A material design circular progress indicator, which spins to indicate that
 /// the application is busy.
+///
+/// {@youtube 560 315 https://www.youtube.com/watch?v=O-rhXZLtpv0}
 ///
 /// A widget that shows progress along a circle. There are two kinds of circular
 /// progress indicators:

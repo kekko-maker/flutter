@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -312,13 +314,7 @@ void main() {
      expect(log, equals(<String>['left']));
      await gesture.up();
      expect(log, equals(<String>['left']));
-
-     // This test doesn't work because it relies on part of the pointer event
-     // dispatching mechanism that is mocked out in testing. We should use the real
-     // mechanism even during testing and enable this test.
-     // TODO(abarth): Test more of the real code and enable this test.
-     // See https://github.com/flutter/flutter/issues/4771.
-   }, skip: true);
+   }, skip: true); // https://github.com/flutter/flutter/issues/4771
 
   testWidgets('popAndPushNamed', (WidgetTester tester) async {
     final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
@@ -493,6 +489,38 @@ void main() {
     expect(observations[2].previous, '/A');
   });
 
+  testWidgets('Route didAdd and dispose in same frame work', (WidgetTester tester) async {
+    // Regression Test for https://github.com/flutter/flutter/issues/61346.
+    Widget buildNavigator() {
+      return Navigator(
+        pages: <Page<void>>[
+          MaterialPage<void>(
+            builder: (BuildContext context) => const Placeholder(),
+          )
+        ],
+        onPopPage: (Route<dynamic> route, dynamic result) => false,
+      );
+    }
+    final TabController controller = TabController(length: 3, vsync: tester);
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: TabBarView(
+          controller: controller,
+          children: <Widget>[
+            buildNavigator(),
+            buildNavigator(),
+            buildNavigator(),
+          ],
+        )
+      ),
+    );
+
+    // This test should finish without crashing.
+    controller.index = 2;
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('replaceNamed replaces', (WidgetTester tester) async {
     final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
       '/' : (BuildContext context) => OnTapPage(id: '/', onTap: () { Navigator.pushReplacementNamed(context, '/A'); }),
@@ -572,7 +600,7 @@ void main() {
     expect(routes['/A'].secondaryAnimation.value, equals(routes['/C'].animation.value));
   });
 
-  testWidgets('new route removed from navigator history druing pushReplacement transition', (WidgetTester tester) async {
+  testWidgets('new route removed from navigator history during pushReplacement transition', (WidgetTester tester) async {
     final Map<String, SlideInOutPageRoute<dynamic>> routes = <String, SlideInOutPageRoute<dynamic>>{};
     final Map<String, WidgetBuilder> builders = <String, WidgetBuilder>{
       '/' : (BuildContext context) => OnTapPage(
@@ -1914,7 +1942,7 @@ void main() {
     expect(tickCount, 4);
   });
 
-  testWidgets('Route annouce correctly for first route and last route', (WidgetTester tester) async {
+  testWidgets('Route announce correctly for first route and last route', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/57133.
     Route<void> previousOfFirst = NotAnnounced();
     Route<void> nextOfFirst = NotAnnounced();

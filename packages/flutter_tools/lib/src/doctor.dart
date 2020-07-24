@@ -76,6 +76,7 @@ class _DefaultDoctorValidatorsProvider implements DoctorValidatorsProvider {
       ...IntelliJValidator.installedValidators,
       ...VsCodeValidator.installedValidators,
     ];
+    final ProxyValidator proxyValidator = ProxyValidator(platform: globals.platform);
     _validators = <DoctorValidator>[
       FlutterValidator(),
       if (androidWorkflow.appliesToHostPlatform)
@@ -87,10 +88,10 @@ class _DefaultDoctorValidatorsProvider implements DoctorValidatorsProvider {
           chromiumLauncher: ChromiumLauncher(
             browserFinder: findChromeExecutable,
             fileSystem: globals.fs,
-            logger: globals.logger,
             operatingSystemUtils: globals.os,
             platform:  globals.platform,
             processManager: globals.processManager,
+            logger: globals.logger,
           ),
           platform: globals.platform,
         ),
@@ -105,8 +106,8 @@ class _DefaultDoctorValidatorsProvider implements DoctorValidatorsProvider {
         ...ideValidators
       else
         NoIdeValidator(),
-      if (ProxyValidator.shouldShow)
-        ProxyValidator(),
+      if (proxyValidator.shouldShow)
+        proxyValidator,
       if (deviceManager.canListAnything)
         DeviceValidator(),
     ];

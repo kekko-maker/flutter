@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -176,7 +178,7 @@ class _RenderMenuItem extends RenderShiftedBox {
 ///
 /// Typically the [child] of a [PopupMenuItem] is a [Text] widget. More
 /// elaborate menus with icons can use a [ListTile]. By default, a
-/// [PopupMenuItem] is kMinInteractiveDimension pixels high. If you use a widget
+/// [PopupMenuItem] is [kMinInteractiveDimension] pixels high. If you use a widget
 /// with a different height, it must be specified in the [height] property.
 ///
 /// {@tool snippet}
@@ -232,7 +234,7 @@ class PopupMenuItem<T> extends PopupMenuEntry<T> {
   /// touches.
   final bool enabled;
 
-  /// The minimum height height of the menu item.
+  /// The minimum height of the menu item.
   ///
   /// Defaults to [kMinInteractiveDimension] pixels.
   @override
@@ -340,11 +342,15 @@ class PopupMenuItemState<T, W extends PopupMenuItem<T>> extends State<W> {
       },
     );
 
-    return InkWell(
-      onTap: widget.enabled ? handleTap : null,
-      canRequestFocus: widget.enabled,
-      mouseCursor: effectiveMouseCursor,
-      child: item,
+    return Semantics(
+      enabled: widget.enabled,
+      button: true,
+      child: InkWell(
+        onTap: widget.enabled ? handleTap : null,
+        canRequestFocus: widget.enabled,
+        mouseCursor: effectiveMouseCursor,
+        child: item,
+      ),
     );
   }
 }

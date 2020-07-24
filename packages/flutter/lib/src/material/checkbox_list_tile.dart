@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'package:flutter/widgets.dart';
 
 import 'checkbox.dart';
@@ -16,6 +18,8 @@ import 'theme_data.dart';
 ///
 /// The entire list tile is interactive: tapping anywhere in the tile toggles
 /// the checkbox.
+///
+/// {@youtube 560 315 https://www.youtube.com/watch?v=RkSqPAn9szs}
 ///
 /// The [value], [onChanged], [activeColor] and [checkColor] properties of this widget are
 /// identical to the similarly-named properties on the [Checkbox] widget.

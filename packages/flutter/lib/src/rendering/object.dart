@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:developer';
 import 'dart:ui' as ui show PictureRecorder;
 
@@ -22,9 +24,14 @@ export 'package:flutter/painting.dart';
 
 /// Base class for data associated with a [RenderObject] by its parent.
 ///
-/// Some render objects wish to store data on their children, such as their
-/// input parameters to the parent's layout algorithm or their position relative
-/// to other children.
+/// Some render objects wish to store data on their children, such as the
+/// children's input parameters to the parent's layout algorithm or the
+/// children's position relative to other children.
+///
+/// See also:
+///
+///  * [RenderObject.setupParentData], which [RenderObject] subclasses may
+///    override to attach specific types of parent data to children.
 class ParentData {
   /// Called when the RenderObject is removed from the tree.
   @protected
@@ -171,7 +178,7 @@ class PaintingContext extends ClipContext {
   void paintChild(RenderObject child, Offset offset) {
     assert(() {
       if (debugProfilePaintsEnabled)
-        Timeline.startSync('${child.runtimeType}', arguments: timelineWhitelistArguments);
+        Timeline.startSync('${child.runtimeType}', arguments: timelineArgumentsIndicatingLandmarkEvent);
       if (debugOnProfilePaint != null)
         debugOnProfilePaint(child);
       return true;
@@ -708,6 +715,8 @@ abstract class Constraints {
 /// Signature for a function that is called for each [RenderObject].
 ///
 /// Used by [RenderObject.visitChildren] and [RenderObject.visitChildrenForSemantics].
+///
+/// The `child` argument must not be null.
 typedef RenderObjectVisitor = void Function(RenderObject child);
 
 /// Signature for a function that is called during layout.
@@ -871,7 +880,7 @@ class PipelineOwner {
   /// See [RendererBinding] for an example of how this function is used.
   void flushLayout() {
     if (!kReleaseMode) {
-      Timeline.startSync('Layout', arguments: timelineWhitelistArguments);
+      Timeline.startSync('Layout', arguments: timelineArgumentsIndicatingLandmarkEvent);
     }
     assert(() {
       _debugDoingLayout = true;
@@ -963,7 +972,7 @@ class PipelineOwner {
   /// See [RendererBinding] for an example of how this function is used.
   void flushPaint() {
     if (!kReleaseMode) {
-      Timeline.startSync('Paint', arguments: timelineWhitelistArguments);
+      Timeline.startSync('Paint', arguments: timelineArgumentsIndicatingLandmarkEvent);
     }
     assert(() {
       _debugDoingPaint = true;
@@ -1802,6 +1811,10 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   /// Typically, subclasses will always return the same value. If the value can
   /// change, then, when it does change, the subclass should make sure to call
   /// [markNeedsLayoutForSizedByParentChange].
+  ///
+  /// Subclasses that return true must not change the dimensions of this render
+  /// object in [performLayout]. Instead, that work should be done by
+  /// [performResize].
   @protected
   bool get sizedByParent => false;
 
@@ -2230,6 +2243,37 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       return;
     assert(() {
       if (_needsCompositingBitsUpdate) {
+        if (parent is RenderObject) {
+          final RenderObject parent = this.parent as RenderObject;
+          bool visitedByParent = false;
+          parent.visitChildren((RenderObject child) {
+            if (child == this) {
+              visitedByParent = true;
+            }
+          });
+          if (!visitedByParent) {
+            throw FlutterError.fromParts(<DiagnosticsNode>[
+              ErrorSummary(
+                "A RenderObject was not visited by the parent's visitChildren "
+                'during paint.',
+              ),
+              parent.describeForError(
+                'The parent was',
+              ),
+              describeForError(
+                'The child that was not visited was'
+              ),
+              ErrorDescription(
+                'A RenderObject with children must implement visitChildren and '
+                'call the visitor exactly once for each child; it also should not '
+                'paint children that were removed with dropChild.'
+              ),
+              ErrorHint(
+                'This usually indicates an error in the Flutter framework itself.'
+              ),
+            ]);
+          }
+        }
         throw FlutterError.fromParts(<DiagnosticsNode>[
           ErrorSummary(
             'Tried to paint a RenderObject before its compositing bits were '

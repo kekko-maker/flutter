@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:ui' show
@@ -712,6 +714,17 @@ class TextEditingValue {
     );
   }
 
+  /// Whether the [composing] range is a valid range within [text].
+  ///
+  /// Returns true if and only if the [composing] range is normalized, its start
+  /// is greater than or equal to 0, and its end is less than or equal to
+  /// [text]'s length.
+  ///
+  /// If this property is false while the [composing] range's `isValid` is true,
+  /// it usually indicates the current [composing] range is invalid because of a
+  /// programming error.
+  bool get isComposingRangeValid => composing.isValid && composing.isNormalized && composing.end <= text.length;
+
   @override
   String toString() => '${objectRuntimeType(this, 'TextEditingValue')}(text: \u2524$text\u251C, selection: $selection, composing: $composing)';
 
@@ -947,7 +960,7 @@ TextInputAction _toTextInputAction(String action) {
       return TextInputAction.send;
     case 'TextInputAction.next':
       return TextInputAction.next;
-    case 'TextInputAction.previuos':
+    case 'TextInputAction.previous':
       return TextInputAction.previous;
     case 'TextInputAction.continue_action':
       return TextInputAction.continueAction;
@@ -987,7 +1000,11 @@ RawFloatingCursorPoint _toTextPoint(FloatingCursorDragState state, Map<String, d
   return RawFloatingCursorPoint(offset: offset, state: state);
 }
 
-/// An interface to the system's text input control.
+/// An low-level interface to the system's text input control.
+///
+/// See also:
+///
+///  * [TextField], a widget in which the user may enter text.
 class TextInput {
   TextInput._() {
     _channel = SystemChannels.textInput;

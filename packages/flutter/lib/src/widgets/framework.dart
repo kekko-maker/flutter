@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:async';
 import 'dart:collection';
 import 'dart:developer';
@@ -187,11 +189,11 @@ abstract class GlobalKey<T extends State<StatefulWidget>> extends Key {
   static void _debugVerifyGlobalKeyReservation() {
     assert(() {
       final Map<GlobalKey, Element> keyToParent = <GlobalKey, Element>{};
-      _debugReservations.forEach((Element parent, Map<Element, GlobalKey> chidToKey) {
+      _debugReservations.forEach((Element parent, Map<Element, GlobalKey> childToKey) {
         // We ignore parent that are detached.
         if (parent.renderObject?.attached == false)
           return;
-        chidToKey.forEach((Element child, GlobalKey key) {
+        childToKey.forEach((Element child, GlobalKey key) {
           // If parent = null, the node is deactivated by its parent and is
           // not re-attached to other part of the tree. We should ignore this
           // node.
@@ -2601,7 +2603,7 @@ class BuildOwner {
       _debugBuilding = true;
       return true;
     }());
-    Timeline.startSync('Build', arguments: timelineWhitelistArguments);
+    Timeline.startSync('Build', arguments: timelineArgumentsIndicatingLandmarkEvent);
     try {
       _scheduledFlushDirtyElements = true;
       if (callback != null) {
@@ -2746,7 +2748,7 @@ class BuildOwner {
   /// After the current call stack unwinds, a microtask that notifies listeners
   /// about changes to global keys will run.
   void finalizeTree() {
-    Timeline.startSync('Finalize tree', arguments: timelineWhitelistArguments);
+    Timeline.startSync('Finalize tree', arguments: timelineArgumentsIndicatingLandmarkEvent);
     try {
       lockState(() {
         _inactiveElements._unmountAll(); // this unregisters the GlobalKeys
@@ -3177,6 +3179,8 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// This method is the core of the widgets system. It is called each time we
   /// are to add, update, or remove a child based on an updated configuration.
   ///
+  /// The `newSlot` argument specifies the new value for this element's [slot].
+  ///
   /// If the `child` is null, and the `newWidget` is not null, then we have a new
   /// child for which we need to create an [Element], configured with `newWidget`.
   ///
@@ -3278,6 +3282,10 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   ///
   /// This method transitions the element from the "initial" lifecycle state to
   /// the "active" lifecycle state.
+  ///
+  /// Subclasses that override this method are likely to want to also override
+  /// [update], [visitChildren], [insertChildRenderObject], [moveChildRenderObject],
+  /// and [removeChildRenderObject].
   @mustCallSuper
   void mount(Element parent, dynamic newSlot) {
     assert(_debugLifecycleState == _ElementLifecycle.initial);
@@ -3307,6 +3315,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   void _debugRemoveGlobalKeyReservation(Element child) {
     GlobalKey._debugRemoveReservationFor(this, child);
   }
+
   /// Change the widget used to configure this element.
   ///
   /// The framework calls this function when the parent wishes to use a
@@ -3378,7 +3387,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// Remove [renderObject] from the render tree.
   ///
   /// The default implementation of this function simply calls
-  /// [detachRenderObject] recursively on its child. The
+  /// [detachRenderObject] recursively on each child. The
   /// [RenderObjectElement.detachRenderObject] override does the actual work of
   /// removing [renderObject] from the render tree.
   ///
@@ -3390,12 +3399,14 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     _slot = null;
   }
 
-  /// Add [renderObject] to the render tree at the location specified by [slot].
+  /// Add [renderObject] to the render tree at the location specified by `newSlot`.
   ///
   /// The default implementation of this function simply calls
-  /// [attachRenderObject] recursively on its child. The
+  /// [attachRenderObject] recursively on each child. The
   /// [RenderObjectElement.attachRenderObject] override does the actual work of
   /// adding [renderObject] to the render tree.
+  ///
+  /// The `newSlot` argument specifies the new value for this element's [slot].
   void attachRenderObject(dynamic newSlot) {
     assert(_slot == null);
     visitChildren((Element child) {
@@ -3407,7 +3418,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   Element _retakeInactiveElement(GlobalKey key, Widget newWidget) {
     // The "inactivity" of the element being retaken here may be forward-looking: if
     // we are taking an element with a GlobalKey from an element that currently has
-    // it as a child, then we know that that element will soon no longer have that
+    // it as a child, then we know that element will soon no longer have that
     // element as a child. The only way that assumption could be false is if the
     // global key is being duplicated, and we'll try to track that using the
     // _debugTrackElementThatWillNeedToBeRebuiltDueToGlobalKeyShenanigans call below.
@@ -3459,6 +3470,8 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// has a widget with that global key, this function will reuse that element
   /// (potentially grafting it from another location in the tree or reactivating
   /// it from the list of inactive elements) rather than creating a new element.
+  ///
+  /// The `newSlot` argument specifies the new value for this element's [slot].
   ///
   /// The element returned by this function will already have been mounted and
   /// will be in the "active" lifecycle state.
@@ -4532,7 +4545,7 @@ abstract class ComponentElement extends Element {
   @override
   void performRebuild() {
     if (!kReleaseMode && debugProfileBuildsEnabled)
-      Timeline.startSync('${widget.runtimeType}',  arguments: timelineWhitelistArguments);
+      Timeline.startSync('${widget.runtimeType}',  arguments: timelineArgumentsIndicatingLandmarkEvent);
 
     assert(_debugSetAllowIgnoredCallsToMarkNeedsBuild(true));
     Widget built;

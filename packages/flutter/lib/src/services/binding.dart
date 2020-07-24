@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -101,14 +103,7 @@ mixin ServicesBinding on BindingBase, SchedulerBinding {
     // TODO(ianh): Remove this complexity once these bugs are fixed.
     final Completer<String> rawLicenses = Completer<String>();
     scheduleTask(() async {
-      // TODO(jonahwilliams): temporary catch to allow migrating LICENSE to NOTICES.
-      // Once both the tool and google3 use notices this can be removed after PR:
-      // https://github.com/flutter/flutter/pull/57871
-      try {
-        rawLicenses.complete(await rootBundle.loadString('NOTICES', cache: false));
-      } on FlutterError {
-        rawLicenses.complete(await rootBundle.loadString('LICENSE', cache: false));
-      }
+      rawLicenses.complete(await rootBundle.loadString('NOTICES', cache: false));
     }, Priority.animation);
     await rawLicenses.future;
     final Completer<List<LicenseEntry>> parsedLicenses = Completer<List<LicenseEntry>>();

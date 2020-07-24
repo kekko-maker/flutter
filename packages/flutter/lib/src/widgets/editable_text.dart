@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui hide TextStyle;
@@ -27,6 +29,7 @@ import 'media_query.dart';
 import 'scroll_controller.dart';
 import 'scroll_physics.dart';
 import 'scrollable.dart';
+import 'text.dart';
 import 'text_selection.dart';
 import 'ticker_provider.dart';
 
@@ -131,7 +134,13 @@ class TextEditingController extends ValueNotifier<TextEditingValue> {
   /// This constructor treats a null [value] argument as if it were
   /// [TextEditingValue.empty].
   TextEditingController.fromValue(TextEditingValue value)
-    : super(value ?? TextEditingValue.empty);
+    : assert(
+        value == null || !value.composing.isValid || value.isComposingRangeValid,
+        'New TextEditingValue $value has an invalid non-empty composing range '
+        '${value.composing}. It is recommended to use a valid composing range, '
+        'even for readonly text fields',
+      ),
+      super(value ?? TextEditingValue.empty);
 
   /// The current string the user is editing.
   String get text => value.text;
@@ -152,12 +161,27 @@ class TextEditingController extends ValueNotifier<TextEditingValue> {
     );
   }
 
+  @override
+  set value(TextEditingValue newValue) {
+    assert(
+      !newValue.composing.isValid || newValue.isComposingRangeValid,
+      'New TextEditingValue $newValue has an invalid non-empty composing range '
+      '${newValue.composing}. It is recommended to use a valid composing range, '
+      'even for readonly text fields',
+    );
+    super.value = newValue;
+  }
+
   /// Builds [TextSpan] from current editing value.
   ///
-  /// By default makes text in composing range appear as underlined.
-  /// Descendants can override this method to customize appearance of text.
+  /// By default makes text in composing range appear as underlined. Descendants
+  /// can override this method to customize appearance of text.
   TextSpan buildTextSpan({TextStyle style , bool withComposing}) {
-    if (!value.composing.isValid || !withComposing) {
+    assert(!value.composing.isValid || !withComposing || value.isComposingRangeValid);
+    // If the composing range is out of range for the current text, ignore it to
+    // preserve the tree integrity, otherwise in release mode a RangeError will
+    // be thrown and this EditableText will be built with a broken subtree.
+    if (!value.isComposingRangeValid || !withComposing) {
       return TextSpan(style: style, text: text);
     }
     final TextStyle composingStyle = style.merge(
@@ -415,6 +439,7 @@ class EditableText extends StatefulWidget {
       selectAll: true,
     ),
     this.autofillHints,
+    this.clipBehavior = Clip.hardEdge,
   }) : assert(controller != null),
        assert(focusNode != null),
        assert(obscuringCharacter != null && obscuringCharacter.length == 1),
@@ -452,11 +477,12 @@ class EditableText extends StatefulWidget {
        assert(scrollPadding != null),
        assert(dragStartBehavior != null),
        assert(toolbarOptions != null),
+       assert(clipBehavior != null),
        _strutStyle = strutStyle,
        keyboardType = keyboardType ?? _inferKeyboardType(autofillHints: autofillHints, maxLines: maxLines),
        inputFormatters = maxLines == 1
            ? <TextInputFormatter>[
-               BlacklistingTextInputFormatter.singleLineFormatter,
+               FilteringTextInputFormatter.singleLineFormatter,
                ...inputFormatters ?? const Iterable<TextInputFormatter>.empty(),
              ]
            : inputFormatters,
@@ -614,6 +640,15 @@ class EditableText extends StatefulWidget {
   /// and the Hebrew phrase to its right, while in a [TextDirection.rtl]
   /// context, the English phrase will be on the right and the Hebrew phrase on
   /// its left.
+  ///
+  /// When LTR text is entered into an RTL field, or RTL text is entered into an
+  /// LTR field, [LRM](https://en.wikipedia.org/wiki/Left-to-right_mark) or
+  /// [RLM](https://en.wikipedia.org/wiki/Right-to-left_mark) characters will be
+  /// inserted alongside whitespace characters, respectively. This is to
+  /// eliminate ambiguous directionality in whitespace and ensure proper caret
+  /// placement. These characters will affect the length of the string and may
+  /// need to be parsed out when doing things like string comparison with other
+  /// text.
   ///
   /// Defaults to the ambient [Directionality], if any.
   ///
@@ -991,8 +1026,9 @@ class EditableText extends StatefulWidget {
   /// If this property is null, [SystemMouseCursors.text] will be used.
   ///
   /// The [mouseCursor] is the only property of [EditableText] that controls the
-  /// mouse pointer. All other properties related to "cursor" stands for the text
-  /// cursor, which is usually a blinking vertical line at the editing position.
+  /// appearance of the mouse pointer. All other properties related to "cursor"
+  /// stands for the text cursor, which is usually a blinking vertical line at
+  /// the editing position.
   final MouseCursor mouseCursor;
 
   /// If true, the [RenderEditable] created by this widget will not handle
@@ -1136,6 +1172,11 @@ class EditableText extends StatefulWidget {
   /// {@endtemplate}
   /// {@macro flutter.services.autofill.autofillHints}
   final Iterable<String> autofillHints;
+
+  /// {@macro flutter.widgets.Clip}
+  ///
+  /// Defaults to [Clip.hardEdge].
+  final Clip clipBehavior;
 
   // Infer the keyboard type of an `EditableText` if it's not specified.
   static TextInputType _inferKeyboardType({
@@ -2243,7 +2284,7 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
                 textAlign: widget.textAlign,
                 textDirection: _textDirection,
                 locale: widget.locale,
-                textHeightBehavior: widget.textHeightBehavior,
+                textHeightBehavior: widget.textHeightBehavior ?? DefaultTextHeightBehavior.of(context),
                 textWidthBasis: widget.textWidthBasis,
                 obscuringCharacter: widget.obscuringCharacter,
                 obscureText: widget.obscureText,
@@ -2266,6 +2307,7 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
                 devicePixelRatio: _devicePixelRatio,
                 promptRectRange: _currentPromptRectRange,
                 promptRectColor: widget.autocorrectionTextRectColor,
+                clipBehavior: widget.clipBehavior,
               ),
             ),
           );
@@ -2347,6 +2389,7 @@ class _Editable extends LeafRenderObjectWidget {
     this.devicePixelRatio,
     this.promptRectRange,
     this.promptRectColor,
+    this.clipBehavior,
   }) : assert(textDirection != null),
        assert(rendererIgnoresPointer != null),
        super(key: key);
@@ -2393,6 +2436,7 @@ class _Editable extends LeafRenderObjectWidget {
   final double devicePixelRatio;
   final TextRange promptRectRange;
   final Color promptRectColor;
+  final Clip clipBehavior;
 
   @override
   RenderEditable createRenderObject(BuildContext context) {
@@ -2435,6 +2479,7 @@ class _Editable extends LeafRenderObjectWidget {
       devicePixelRatio: devicePixelRatio,
       promptRectRange: promptRectRange,
       promptRectColor: promptRectColor,
+      clipBehavior: clipBehavior,
     );
   }
 
@@ -2476,6 +2521,7 @@ class _Editable extends LeafRenderObjectWidget {
       ..devicePixelRatio = devicePixelRatio
       ..paintCursorAboveText = paintCursorAboveText
       ..promptRectColor = promptRectColor
+      ..clipBehavior = clipBehavior
       ..setPromptRectRange(promptRectRange);
   }
 }
@@ -2486,7 +2532,7 @@ class _Editable extends LeafRenderObjectWidget {
 //
 // When typing in a direction that opposes the base direction
 // of the paragraph, un-enclosed whitespace gets the directionality
-// of the paragraph. This is often at odds with what is immeditely
+// of the paragraph. This is often at odds with what is immediately
 // being typed causing the caret to jump to the wrong side of the text.
 // This formatter makes use of the RLM and LRM to cause the text
 // shaper to inherently treat the whitespace as being surrounded
@@ -2569,9 +2615,14 @@ class _WhitespaceDirectionalityFormatter extends TextInputFormatter {
         composingEnd -= outputCodepoints.length < composingEnd ? 1 : 0;
       }
 
+     final bool isBackspace = oldValue.text.runes.length - newValue.text.runes.length == 1 &&
+                              isDirectionalityMarker(oldValue.text.runes.last) &&
+                              oldValue.text.substring(0, oldValue.text.length - 1) == newValue.text;
+
       bool previousWasWhitespace = false;
       bool previousWasDirectionalityMarker = false;
       int previousNonWhitespaceCodepoint;
+      int index = 0;
       for (final int codepoint in newValue.text.runes) {
         if (isWhitespace(codepoint)) {
           // Only compute the directionality of the non-whitespace
@@ -2585,9 +2636,15 @@ class _WhitespaceDirectionalityFormatter extends TextInputFormatter {
             subtractFromLength();
             outputCodepoints.removeLast();
           }
-          outputCodepoints.add(codepoint);
-          addToLength();
-          outputCodepoints.add(_previousNonWhitespaceDirection == TextDirection.rtl ? _rlm : _lrm);
+          // Handle trailing whitespace deleting the directionality char instead of the whitespace.
+          if (isBackspace && index == newValue.text.runes.length - 1) {
+            // Do not append the whitespace to the outputCodepoints.
+            subtractFromLength();
+          } else {
+            outputCodepoints.add(codepoint);
+            addToLength();
+            outputCodepoints.add(_previousNonWhitespaceDirection == TextDirection.rtl ? _rlm : _lrm);
+          }
 
           previousWasWhitespace = true;
           previousWasDirectionalityMarker = false;
@@ -2604,7 +2661,7 @@ class _WhitespaceDirectionalityFormatter extends TextInputFormatter {
           previousWasDirectionalityMarker = true;
         } else {
           // If the whitespace was already enclosed by the same directionality,
-          // we can remove the artifically added marker.
+          // we can remove the artificially added marker.
           if (!previousWasDirectionalityMarker &&
               previousWasWhitespace &&
               getDirection(codepoint) == _previousNonWhitespaceDirection) {
@@ -2618,6 +2675,7 @@ class _WhitespaceDirectionalityFormatter extends TextInputFormatter {
           previousWasWhitespace = false;
           previousWasDirectionalityMarker = false;
         }
+        index++;
       }
       final String formatted = String.fromCharCodes(outputCodepoints);
       return TextEditingValue(
